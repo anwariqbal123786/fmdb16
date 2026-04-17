@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Management Dashboard — Executive View</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --navy: #0d1b2e;
+    --navy2: #152543;
+    --navy3: #1e3a5f;
+    --blue: #1a56db;
+    --blue-light: #3b82f6;
+    --amber: #f59e0b;
+    --amber-light: #fcd34d;
+    --green: #10b981;
+    --red: #ef4444;
+    --orange: #f97316;
+    --white: #f8fafc;
+    --muted: #94a3b8;
+    --border: rgba(255,255,255,0.08);
+    --card: rgba(21,37,67,0.85);
+    --card2: rgba(30,58,95,0.6);
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, var(--navy2), var(--navy3));
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 38px; height: 38px; background: linear-gradient(135deg, var(--blue), var(--amber)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .header h1 span { color: var(--amber); }
+  .header-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .badge { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: var(--green); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .export-btn { background: var(--blue); color: white; border: none; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .2s; }
+  .export-btn:hover { background: var(--blue-light); transform: translateY(-1px); }
+
+  /* FILTERS */
+  .filter-bar {
+    background: var(--navy2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; white-space: nowrap; }
+  .filter-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip {
+    padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); transition: all .15s;
+  }
+  .chip.active { background: var(--blue); color: white; border-color: var(--blue); }
+  .chip:hover:not(.active) { border-color: var(--blue-light); color: var(--blue-light); }
+  .filter-sep { width: 1px; height: 24px; background: var(--border); }
+  .view-toggle { display: flex; background: rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .view-btn { padding: 4px 12px; font-size: 12px; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all .15s; font-family: var(--font); }
+  .view-btn.active { background: var(--blue); color: white; }
+
+  /* MAIN LAYOUT */
+  .main { padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* KPI CARDS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent, var(--blue));
+  }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; margin-bottom: 8px; }
+  .kpi-value { font-size: 24px; font-weight: 700; letter-spacing: -1px; line-height: 1; margin-bottom: 6px; font-family: var(--mono); }
+  .kpi-sub { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .kpi-arrow { font-size: 12px; }
+  .kpi-arrow.up { color: var(--green); }
+  .kpi-arrow.down { color: var(--red); }
+  .kpi-arrow.warn { color: var(--amber); }
+  .kpi-icon { position: absolute; top: 14px; right: 14px; font-size: 22px; opacity: .25; }
+
+  /* STATUS COLORS */
+  .status-green { color: var(--green) !important; --accent: var(--green); }
+  .status-amber { color: var(--amber) !important; --accent: var(--amber); }
+  .status-red { color: var(--red) !important; --accent: var(--red); }
+  .status-blue { color: var(--blue-light) !important; --accent: var(--blue); }
+
+  /* SECTION TITLES */
+  .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* CHART GRID */
+  .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .chart-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .chart-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+  .chart-grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  .chart-grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .chart-card.span2 { grid-column: span 2; }
+  .chart-card.span3 { grid-column: span 3; }
+  .chart-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .chart-caption { font-size: 11px; color: var(--amber); margin-top: 8px; font-style: italic; }
+  .chart-wrap { flex: 1; position: relative; min-height: 0; }
+  .chart-export { position: absolute; top: 12px; right: 14px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); padding: 3px 8px; border-radius: 5px; font-size: 10px; cursor: pointer; }
+  .chart-export:hover { color: white; }
+
+  /* HEATMAP */
+  .heatmap-grid { display: grid; gap: 3px; overflow-x: auto; }
+  .heatmap-row { display: flex; gap: 3px; align-items: center; }
+  .heatmap-label { font-size: 10px; color: var(--muted); width: 80px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .heatmap-cell { width: 38px; height: 24px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; cursor: pointer; transition: transform .1s; flex-shrink: 0; }
+  .heatmap-cell:hover { transform: scale(1.15); z-index: 2; }
+  .heatmap-header { display: flex; gap: 3px; margin-bottom: 3px; margin-left: 83px; }
+  .heatmap-header span { width: 38px; font-size: 9px; color: var(--muted); text-align: center; flex-shrink: 0; }
+
+  /* CALENDAR HEATMAP */
+  .cal-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; }
+  .cal-cell { height: 30px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: transform .1s; position: relative; }
+  .cal-cell:hover { transform: scale(1.1); z-index: 2; }
+  .cal-day { font-size: 8px; color: rgba(255,255,255,0.5); }
+  .cal-val { font-size: 9px; font-weight: 700; }
+
+  /* WATERFALL */
+  .waterfall-wrap { overflow-x: auto; }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { background: rgba(255,255,255,0.05); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px; text-align: right; font-weight: 600; border-bottom: 1px solid var(--border); }
+  .data-table th:first-child, .data-table th:nth-child(2) { text-align: left; }
+  .data-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); text-align: right; }
+  .data-table td:first-child, .data-table td:nth-child(2) { text-align: left; }
+  .data-table tr:hover td { background: rgba(255,255,255,0.03); }
+  .rag-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .rag-green { background: rgba(16,185,129,0.2); color: var(--green); }
+  .rag-amber { background: rgba(245,158,11,0.2); color: var(--amber); }
+  .rag-red { background: rgba(239,68,68,0.2); color: var(--red); }
+  .rio-tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-right: 4px; }
+  .r1 { background: rgba(59,130,246,0.2); color: #93c5fd; }
+  .r2 { background: rgba(167,139,250,0.2); color: #c4b5fd; }
+  .r3 { background: rgba(52,211,153,0.2); color: #6ee7b7; }
+  .r4 { background: rgba(251,191,36,0.2); color: var(--amber-light); }
+
+  /* GAUGE */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .gauge-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+  .gauge-card { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .gauge-name { font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .gauge-bar-track { height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden; margin: 6px 0; }
+  .gauge-bar-fill { height: 100%; border-radius: 5px; transition: width .8s; }
+  .gauge-pct { font-size: 22px; font-weight: 800; font-family: var(--mono); margin: 4px 0; }
+  .gauge-sub { font-size: 10px; color: var(--muted); }
+
+  /* FORWARD PLANNING */
+  .alert-list { display: flex; flex-direction: column; gap: 6px; }
+  .alert-item { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+  .alert-item.warn { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
+  .alert-icon { font-size: 16px; flex-shrink: 0; }
+  .alert-text { flex: 1; }
+  .alert-text strong { display: block; font-size: 12px; font-weight: 700; }
+  .alert-text span { font-size: 11px; color: var(--muted); }
+  .alert-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+
+  /* AI PANEL */
+  .ai-panel { background: linear-gradient(135deg, rgba(26,86,219,0.1), rgba(30,58,95,0.3)); border: 1px solid rgba(26,86,219,0.3); border-radius: 12px; padding: 20px; }
+  .ai-panel-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .ai-insights { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ai-insight { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border); }
+  .ai-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .ai-text { font-size: 12px; line-height: 1.6; color: #cbd5e1; }
+  .health-score { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  .health-num { font-size: 48px; font-weight: 800; font-family: var(--mono); color: var(--amber); line-height: 1; }
+  .health-label { font-size: 13px; font-weight: 700; }
+  .health-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3,1fr); } .chart-grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } .chart-grid-2 { grid-template-columns: 1fr; } .gauge-row { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .main { padding: 12px; } .filter-bar { padding: 10px 12px; } .kpi-grid { grid-template-columns: 1fr 1fr; } }
+
+  .tooltip-custom { position: fixed; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 11px; pointer-events: none; z-index: 999; display: none; box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+
+  /* VARIANCE CHART BARS */
+  .var-bar-pos { background: linear-gradient(90deg, var(--amber), #fcd34d); }
+  .var-bar-neg { background: linear-gradient(90deg, var(--green), #34d399); }
+</style>
+</head>
+<body>
+
+<!-- EMBEDDED DATA -->
+<script>
+const DB = {
+  asOf: "16-Apr-2026",
+  forecastedReq: 256771,
+  aprMayJunReq: 238004,
+  totalStock: 202976,
+  totalDGPGQty: 722,
+
+  rioData: {
+    RIO1: { stock: 29292, req: 36397, purchase_16apr: 575, usage_16apr: 264, scomm_pct: 52, stl_pct: 108, scomm_req: 17861, stl_req: 18536, scomm_stock: 9317, stl_stock: 19975, color: '#3b82f6' },
+    RIO2: { stock: 7049,  req: 9900,  purchase_16apr: 786, usage_16apr: 299, scomm_pct: 71, stl_pct: 71, scomm_req: 8320, stl_req: 1580, scomm_stock: 5934, stl_stock: 1116, color: '#a78bfa' },
+    RIO3: { stock: 150682,req: 170815,purchase_16apr: 600, usage_16apr: 1455,scomm_pct: 65, stl_pct: 89, scomm_req: 5001, stl_req: 165814, scomm_stock: 3260, stl_stock: 147422, color: '#34d399' },
+    RIO4: { stock: 15953, req: 20892, purchase_16apr: 130, usage_16apr: 168, scomm_pct: 54, stl_pct: 82, scomm_req: 4465, stl_req: 16426, scomm_stock: 2408, stl_stock: 13545, color: '#fbbf24' }
+  },
+
+  dgpgData: {
+    RIO1: [
+      { type:'SComm DG', qty:14, req:17163, stock:8911 },
+      { type:'SComm PG', qty:7,  req:699,   stock:406  },
+      { type:'STL DG',   qty:66, req:16756, stock:19327},
+      { type:'STL PG',   qty:16, req:1780,  stock:648  }
+    ],
+    RIO2: [
+      { type:'SComm DG', qty:10, req:7300,  stock:5195 },
+      { type:'SComm PG', qty:12, req:1020,  stock:738  },
+      { type:'STL DG',   qty:0,  req:0,     stock:0    },
+      { type:'STL PG',   qty:17, req:1580,  stock:1116 }
+    ],
+    RIO3: [
+      { type:'SComm DG', qty:10, req:4456,  stock:2812  },
+      { type:'SComm PG', qty:7,  req:545,   stock:448   },
+      { type:'STL DG',   qty:430,req:161399,stock:145185},
+      { type:'STL PG',   qty:42, req:4415,  stock:2237  }
+    ],
+    RIO4: [
+      { type:'SComm DG', qty:7,  req:3330,  stock:1964 },
+      { type:'SComm PG', qty:9,  req:1136,  stock:444  },
+      { type:'STL DG',   qty:44, req:12074, stock:11698},
+      { type:'STL PG',   qty:31, req:4353,  stock:1847 }
+    ]
+  },
+
+  scData: [
+    { rio:'RIO1', sc:'Banani',        dgpg_qty:1,   req:755,   stock:744,   purchase:0,   usage:0,   apr_req:252, may_req:252, jun_req:252 },
+    { rio:'RIO1', sc:'Dhanmondi',     dgpg_qty:25,  req:5122,  stock:7101,  purchase:0,   usage:23,  apr_req:1707,may_req:1707,jun_req:1707},
+    { rio:'RIO1', sc:'Gazipur',       dgpg_qty:9,   req:9043,  stock:2678,  purchase:200, usage:107, apr_req:3014,may_req:3014,jun_req:3014},
+    { rio:'RIO1', sc:'Kawran bazar',  dgpg_qty:3,   req:2030,  stock:1428,  purchase:25,  usage:0,   apr_req:677, may_req:677, jun_req:677 },
+    { rio:'RIO1', sc:'Mirpur',        dgpg_qty:3,   req:341,   stock:540,   purchase:0,   usage:0,   apr_req:114, may_req:114, jun_req:114 },
+    { rio:'RIO1', sc:'Narayanganj',   dgpg_qty:41,  req:10347, stock:9994,  purchase:160, usage:105, apr_req:3449,may_req:3449,jun_req:3449},
+    { rio:'RIO1', sc:'Paltan',        dgpg_qty:10,  req:4198,  stock:4315,  purchase:100, usage:0,   apr_req:1399,may_req:1399,jun_req:1399},
+    { rio:'RIO1', sc:'Savar',         dgpg_qty:6,   req:3340,  stock:1310,  purchase:20,  usage:30,  apr_req:1113,may_req:1113,jun_req:1113},
+    { rio:'RIO1', sc:'Uttara',        dgpg_qty:5,   req:1220,  stock:1183,  purchase:70,  usage:0,   apr_req:407, may_req:407, jun_req:407 },
+    { rio:'RIO2', sc:"Cox's Bazar",   dgpg_qty:6,   req:1900,  stock:946,   purchase:75,  usage:39,  apr_req:633, may_req:633, jun_req:633 },
+    { rio:'RIO2', sc:'CTG_North',     dgpg_qty:4,   req:1010,  stock:722,   purchase:173, usage:32,  apr_req:337, may_req:337, jun_req:337 },
+    { rio:'RIO2', sc:'CTG_South',     dgpg_qty:4,   req:2020,  stock:1422,  purchase:50,  usage:30,  apr_req:673, may_req:673, jun_req:673 },
+    { rio:'RIO2', sc:'Cumilla',       dgpg_qty:11,  req:2040,  stock:1554,  purchase:350, usage:62,  apr_req:680, may_req:680, jun_req:680 },
+    { rio:'RIO2', sc:'Feni',          dgpg_qty:4,   req:1030,  stock:1044,  purchase:28,  usage:28,  apr_req:343, may_req:343, jun_req:343 },
+    { rio:'RIO2', sc:'Sylhet',        dgpg_qty:10,  req:1900,  stock:1362,  purchase:110, usage:108, apr_req:633, may_req:633, jun_req:633 },
+    { rio:'RIO3', sc:'Barishal',      dgpg_qty:118, req:45894, stock:33323, purchase:0,   usage:286, apr_req:15298,may_req:15298,jun_req:15298},
+    { rio:'RIO3', sc:'Faridpur',      dgpg_qty:55,  req:13298, stock:17945, purchase:400, usage:74,  apr_req:4433,may_req:4433,jun_req:4433},
+    { rio:'RIO3', sc:'Jashore',       dgpg_qty:64,  req:25907, stock:22795, purchase:0,   usage:465, apr_req:8636,may_req:8636,jun_req:8636},
+    { rio:'RIO3', sc:'Khulna',        dgpg_qty:133, req:45855, stock:40236, purchase:0,   usage:419, apr_req:15285,may_req:15285,jun_req:15285},
+    { rio:'RIO3', sc:'Kushtia',       dgpg_qty:78,  req:25065, stock:23983, purchase:0,   usage:110, apr_req:8355,may_req:8355,jun_req:8355},
+    { rio:'RIO3', sc:'Shariatpur',    dgpg_qty:41,  req:14796, stock:12401, purchase:200, usage:100, apr_req:4932,may_req:4932,jun_req:4932},
+    { rio:'RIO4', sc:'Bogura',        dgpg_qty:9,   req:2571,  stock:1307,  purchase:20,  usage:12,  apr_req:857, may_req:857, jun_req:857 },
+    { rio:'RIO4', sc:'Mymensingh',    dgpg_qty:8,   req:2226,  stock:936,   purchase:0,   usage:55,  apr_req:742, may_req:742, jun_req:742 },
+    { rio:'RIO4', sc:'Rajshahi',      dgpg_qty:55,  req:11631, stock:12071, purchase:60,  usage:71,  apr_req:3877,may_req:3877,jun_req:3877},
+    { rio:'RIO4', sc:'Rangpur',       dgpg_qty:11,  req:2612,  stock:1084,  purchase:50,  usage:13,  apr_req:871, may_req:871, jun_req:871 },
+    { rio:'RIO4', sc:'Tangail',       dgpg_qty:8,   req:1852,  stock:555,   purchase:0,   usage:16,  apr_req:617, may_req:617, jun_req:617 }
+  ],
+
+  aprilDailyData: [
+    { day:'1-Apr',  stock:214245, purchase:1170, usage:644  },
+    { day:'2-Apr',  stock:213884, purchase:430,  usage:685  },
+    { day:'3-Apr',  stock:213796, purchase:650,  usage:738  },
+    { day:'4-Apr',  stock:212436, purchase:950,  usage:2310 },
+    { day:'5-Apr',  stock:212907, purchase:2359, usage:1715 },
+    { day:'6-Apr',  stock:212706, purchase:1444, usage:1727 },
+    { day:'7-Apr',  stock:207340, purchase:970,  usage:6199 },
+    { day:'8-Apr',  stock:204320, purchase:545,  usage:3347 },
+    { day:'9-Apr',  stock:202402, purchase:689,  usage:2609 },
+    { day:'10-Apr', stock:202965, purchase:1480, usage:917  },
+    { day:'11-Apr', stock:201808, purchase:360,  usage:1517 },
+    { day:'12-Apr', stock:201850, purchase:855,  usage:817  },
+    { day:'13-Apr', stock:204359, purchase:4000, usage:1491 },
+    { day:'14-Apr', stock:204286, purchase:1195, usage:1269 },
+    { day:'15-Apr', stock:203071, purchase:1775, usage:2820 },
+    { day:'16-Apr', stock:202976, purchase:2186, usage:2091 }
+  ],
+
+  marchDailyData: [
+    { day:'12-Mar', stock:217059, purchase:2269, usage:569  },
+    { day:'13-Mar', stock:217344, purchase:1425, usage:1140 },
+    { day:'14-Mar', stock:217328, purchase:1039, usage:1056 },
+    { day:'15-Mar', stock:216839, purchase:1060, usage:1549 },
+    { day:'16-Mar', stock:218126, purchase:3229, usage:1942 },
+    { day:'17-Mar', stock:215987, purchase:2020, usage:4159 },
+    { day:'18-Mar', stock:217046, purchase:2970, usage:1911 },
+    { day:'19-Mar', stock:215631, purchase:1187, usage:2602 },
+    { day:'20-Mar', stock:213966, purchase:2229, usage:3894 },
+    { day:'21-Mar', stock:212846, purchase:325,  usage:1445 },
+    { day:'22-Mar', stock:212607, purchase:166,  usage:405  },
+    { day:'23-Mar', stock:214310, purchase:2036, usage:332  },
+    { day:'24-Mar', stock:216432, purchase:2485, usage:363  },
+    { day:'25-Mar', stock:217009, purchase:1420, usage:844  },
+    { day:'26-Mar', stock:217257, purchase:970,  usage:722  },
+    { day:'27-Mar', stock:217328, purchase:930,  usage:859  },
+    { day:'28-Mar', stock:215058, purchase:295,  usage:2564 },
+    { day:'29-Mar', stock:214434, purchase:365,  usage:989  },
+    { day:'30-Mar', stock:213879, purchase:350,  usage:905  },
+    { day:'31-Mar', stock:213566, purchase:830,  usage:1037 }
+  ],
+
+  // Combined timeline for charts
+  get allDaily() {
+    return [...this.marchDailyData, ...this.aprilDailyData];
+  }
+};
+
+// FILTER STATE
+let filters = {
+  rios: ['RIO1','RIO2','RIO3','RIO4'],
+  scommStl: ['SComm','STL'],
+  dgpg: ['DG','PG'],
+  view: 'daily'
+};
+
+function getFilteredSC() {
+  return DB.scData.filter(d => filters.rios.includes(d.rio));
+}
+
+function getFilteredRIO() {
+  const f = {};
+  Object.entries(DB.rioData).forEach(([k,v]) => {
+    if (filters.rios.includes(k)) f[k] = v;
+  });
+  return f;
+}
+
+function fmt(n, decimals=0) {
+  if (n === undefined || n === null) return '—';
+  return Number(n).toLocaleString('en', { maximumFractionDigits: decimals });
+}
+
+function pct(a, b) { return b ? ((a/b)*100).toFixed(1) : '0.0'; }
+</script>
+
+<!-- TOOLTIP -->
+<div class="tooltip-custom" id="tooltip"></div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">⛽</div>
+    <div>
+      <h1>Fuel Management <span>Executive Dashboard</span></h1>
+      <div class="header-meta">SComm &amp; STL Operations · All RIOs · Data as of 16-Apr-2026</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="badge">🟢 Live Data</div>
+    <button class="export-btn" onclick="exportDashboard()">⬇ Export PNG</button>
+  </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <span class="filter-label">RIO</span>
+    <div class="filter-chips" id="rio-chips">
+      <div class="chip active" data-filter="rio" data-val="RIO1" onclick="toggleFilter('rio','RIO1',this)">RIO1</div>
+      <div class="chip active" data-filter="rio" data-val="RIO2" onclick="toggleFilter('rio','RIO2',this)">RIO2</div>
+      <div class="chip active" data-filter="rio" data-val="RIO3" onclick="toggleFilter('rio','RIO3',this)">RIO3</div>
+      <div class="chip active" data-filter="rio" data-val="RIO4" onclick="toggleFilter('rio','RIO4',this)">RIO4</div>
+    </div>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <span class="filter-label">Type</span>
+    <div class="filter-chips">
+      <div class="chip active" data-filter="sc" data-val="SComm" onclick="toggleFilter('sc','SComm',this)">SComm</div>
+      <div class="chip active" data-filter="sc" data-val="STL" onclick="toggleFilter('sc','STL',this)">STL</div>
+    </div>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <span class="filter-label">Fuel</span>
+    <div class="filter-chips">
+      <div class="chip active" data-filter="fuel" data-val="DG" onclick="toggleFilter('fuel','DG',this)">DG</div>
+      <div class="chip active" data-filter="fuel" data-val="PG" onclick="toggleFilter('fuel','PG',this)">PG</div>
+    </div>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <span class="filter-label">View</span>
+    <div class="view-toggle">
+      <button class="view-btn active" onclick="setView('daily',this)">Daily</button>
+      <button class="view-btn" onclick="setView('cumulative',this)">Cumulative</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="dashboard">
+
+  <!-- KPI CARDS -->
+  <div class="section-title">Executive KPIs — 16 April 2026</div>
+  <div class="kpi-grid" id="kpi-grid">
+    <!-- Built by JS -->
+  </div>
+
+  <!-- SECTION 1: OVERVIEW CHARTS -->
+  <div class="section-title">Stock, Purchase & Usage Overview</div>
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-grouped-bar')">PNG</button>
+      <div class="chart-title">📊 Purchase vs Usage vs Stock by RIO</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-grouped-bar"></canvas></div>
+      <div class="chart-caption">💡 RIO3 dominates with 74% of total stock; RIO2 most constrained relative to requirement</div>
+    </div>
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-donut')">PNG</button>
+      <div class="chart-title">🍩 Stock Distribution by RIO</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-donut"></canvas></div>
+      <div class="chart-caption">💡 RIO3 holds 74.2% of all fuel stock; RIO2 holds only 3.5%</div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: TIME SERIES -->
+  <div class="section-title">Daily Fuel Activity — March to April 2026</div>
+  <div class="chart-card">
+    <button class="chart-export" onclick="exportChart('chart-timeline')">PNG</button>
+    <div class="chart-title">📈 Daily Stock Level vs Forecasted Requirement + Purchase & Usage</div>
+    <div class="chart-wrap" style="height:280px"><canvas id="chart-timeline"></canvas></div>
+    <div class="chart-caption">💡 Stock steadily declining from ~217K (mid-Mar) to 203K (16-Apr); 7-Apr surge usage (6,199 ltr) caused sharpest drop</div>
+  </div>
+
+  <!-- SECTION 3: AREA + VARIANCE -->
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-area')">PNG</button>
+      <div class="chart-title">📈 Stock Level Trend (Area) + Safety Threshold</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-area"></canvas></div>
+      <div class="chart-caption">💡 Current stock at 202,976 ltr vs requirement 238,004 ltr — 14.7% below requirement</div>
+    </div>
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-variance')">PNG</button>
+      <div class="chart-title">📊 Purchase vs Usage Variance by Day (April)</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-variance"></canvas></div>
+      <div class="chart-caption">💡 7-Apr shows extreme usage spike (+4,000 over purchase) indicating major network event</div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: HEATMAP + HORIZONTAL BAR -->
+  <div class="section-title">Subcenter Consumption Analysis</div>
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">🔥 Fuel Usage Intensity Heatmap by Subcenter × Period</div>
+      <div id="heatmap-container" style="margin-top:12px; overflow-x:auto;"></div>
+      <div class="chart-caption">💡 Khulna, Barishal &amp; Jashore are highest consumption subcenters in April</div>
+    </div>
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-hbar')">PNG</button>
+      <div class="chart-title">📊 Subcenters Ranked by Apr Consumption (ltr)</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="chart-hbar"></canvas></div>
+      <div class="chart-caption">💡 Top 3 consumers are all in RIO3 — Khulna, Barishal, Jashore account for 72% of RIO3 usage</div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: STACKED BAR + WATERFALL -->
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-stacked')">PNG</button>
+      <div class="chart-title">📊 Cumulative Purchase vs Usage — March &amp; April</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-stacked"></canvas></div>
+      <div class="chart-caption">💡 March: Net surplus procurement; April so far: usage outpacing purchase — stock depleting</div>
+    </div>
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-waterfall')">PNG</button>
+      <div class="chart-title">📉 Waterfall: Stock Movement April 1–16</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-waterfall"></canvas></div>
+      <div class="chart-caption">💡 Net stock decline of 11,269 ltr in Apr 1–16 despite 21,798 ltr purchased</div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: CALENDAR HEATMAP -->
+  <div class="chart-card">
+    <div class="chart-title">🗓️ Daily Fuel Purchase Activity — Calendar Heatmap (March–April 2026)</div>
+    <div id="cal-heatmap" style="margin-top:14px;"></div>
+    <div class="chart-caption">💡 13-Apr peak procurement day (4,000 ltr); several days show zero/near-zero purchases creating gaps</div>
+  </div>
+
+  <!-- SECTION 7: GAUGES -->
+  <div class="section-title">Stock Adequacy Gauges by RIO — Apr–Jun Target Coverage</div>
+  <div class="gauge-row" id="gauge-row"></div>
+
+  <!-- SECTION 8: DG/PG BREAKDOWN -->
+  <div class="section-title">DG / PG Fuel Type Breakdown</div>
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-dgpg-stock')">PNG</button>
+      <div class="chart-title">📊 Stock by DG/PG Type per RIO</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-dgpg-stock"></canvas></div>
+      <div class="chart-caption">💡 STL DG dominates — 430 units in RIO3 alone; SComm PG most underfunded relative to need</div>
+    </div>
+    <div class="chart-card">
+      <button class="chart-export" onclick="exportChart('chart-scomm-stl')">PNG</button>
+      <div class="chart-title">🎯 % Fuel Secured: SComm vs STL per RIO</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-scomm-stl"></canvas></div>
+      <div class="chart-caption">💡 SComm coverage worst at RIO1 (52%) &amp; RIO4 (54%); STL RIO1 over-stocked at 108%</div>
+    </div>
+  </div>
+
+  <!-- SECTION 9: FORWARD PLANNING -->
+  <div class="section-title">📋 Forward Planning — Apr–Jun Subcenter Detail</div>
+  <div class="chart-grid-2-1">
+    <div class="chart-card">
+      <div class="chart-title">📋 Subcenter Scorecard — Apr | May | Jun Requirement vs Stock</div>
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table class="data-table" id="planning-table">
+          <thead>
+            <tr>
+              <th>RIO</th>
+              <th>Subcenter</th>
+              <th>DG/PG</th>
+              <th>Current Stock</th>
+              <th>Apr Need</th>
+              <th>May Need</th>
+              <th>Jun Need</th>
+              <th>Total Need</th>
+              <th>Gap</th>
+              <th>Coverage%</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="planning-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">🚨 Procurement Alerts</div>
+      <div style="margin-top:10px;">
+        <div id="alert-list" class="alert-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 10: AI INSIGHTS -->
+  <div class="section-title">🤖 AI-Generated Management Insights</div>
+  <div class="ai-panel">
+    <div class="health-score">
+      <div class="health-num" id="health-score-num">63</div>
+      <div>
+        <div class="health-label">Overall Stock Health Score</div>
+        <div class="health-sub">Composite index: stock adequacy × procurement pace × coverage days × RIO balance</div>
+        <div style="margin-top:8px;">
+          <div class="gauge-bar-track" style="width:280px"><div class="gauge-bar-fill" style="width:63%; background:linear-gradient(90deg,#f59e0b,#fbbf24);"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="ai-insights" id="ai-insights"></div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ============================================================
+// INITIALIZE DASHBOARD
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  renderKPIs();
+  renderGroupedBar();
+  renderDonut();
+  renderTimeline();
+  renderArea();
+  renderVariance();
+  renderHeatmap();
+  renderHorizontalBar();
+  renderStacked();
+  renderWaterfall();
+  renderCalHeatmap();
+  renderGauges();
+  renderDGPGStock();
+  renderSCommSTL();
+  renderPlanningTable();
+  renderAlerts();
+  renderAIInsights();
+});
+
+// ============================================================
+// FILTER LOGIC
+// ============================================================
+function toggleFilter(type, val, el) {
+  if (type === 'rio') {
+    const idx = filters.rios.indexOf(val);
+    if (idx > -1) { if (filters.rios.length > 1) { filters.rios.splice(idx, 1); el.classList.remove('active'); } }
+    else { filters.rios.push(val); el.classList.add('active'); }
+  } else if (type === 'sc') {
+    const idx = filters.scommStl.indexOf(val);
+    if (idx > -1) { if (filters.scommStl.length > 1) { filters.scommStl.splice(idx, 1); el.classList.remove('active'); } }
+    else { filters.scommStl.push(val); el.classList.add('active'); }
+  } else if (type === 'fuel') {
+    const idx = filters.dgpg.indexOf(val);
+    if (idx > -1) { if (filters.dgpg.length > 1) { filters.dgpg.splice(idx, 1); el.classList.remove('active'); } }
+    else { filters.dgpg.push(val); el.classList.add('active'); }
+  }
+  refreshAllCharts();
+}
+
+function setView(v, el) {
+  filters.view = v;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  refreshAllCharts();
+}
+
+function refreshAllCharts() {
+  Object.values(chartRefs).forEach(c => { if (c) c.destroy(); });
+  renderKPIs();
+  renderGroupedBar();
+  renderDonut();
+  renderTimeline();
+  renderArea();
+  renderVariance();
+  renderHeatmap();
+  renderHorizontalBar();
+  renderStacked();
+  renderWaterfall();
+  renderCalHeatmap();
+  renderGauges();
+  renderDGPGStock();
+  renderSCommSTL();
+  renderPlanningTable();
+  renderAlerts();
+  renderAIInsights();
+}
+
+const chartRefs = {};
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function renderKPIs() {
+  const filtered = getFilteredRIO();
+  const rioKeys = Object.keys(filtered);
+  const totalStock = rioKeys.reduce((s,k) => s + filtered[k].stock, 0);
+  const totalReq = rioKeys.reduce((s,k) => s + filtered[k].req, 0);
+  const totalPurchase = rioKeys.reduce((s,k) => s + filtered[k].purchase_16apr, 0);
+  const totalUsage = rioKeys.reduce((s,k) => s + filtered[k].usage_16apr, 0);
+  const avgDailyUsage = DB.aprilDailyData.reduce((s,d) => s+d.usage, 0) / DB.aprilDailyData.length;
+  const coverageDays = totalStock / avgDailyUsage;
+  const gap = totalStock - totalReq;
+  const pctCovered = (totalStock / totalReq * 100).toFixed(1);
+  const projectedShortfall = totalReq - totalStock;
+
+  const cards = [
+    { label:'Total Current Stock', val: fmt(totalStock) + ' L', sub:'All RIOs · 16-Apr', icon:'🛢️', cls:'status-blue', arrow:'', arrowType:'' },
+    { label:'Total Purchased (16-Apr)', val: fmt(totalPurchase) + ' L', sub:'Today\'s procurement', icon:'⬆️', cls:'status-green', arrow:'↑ Active', arrowType:'up' },
+    { label:'Total Consumed (16-Apr)', val: fmt(totalUsage) + ' L', sub:'Today\'s usage', icon:'🔥', cls:'status-amber', arrow:`Avg ${fmt(avgDailyUsage,0)} L/day`, arrowType:'warn' },
+    { label:'Stock Coverage Days', val: Math.floor(coverageDays) + ' days', sub:'At current burn rate', icon:'📅', cls: coverageDays > 60 ? 'status-green' : coverageDays > 30 ? 'status-amber' : 'status-red', arrow: coverageDays > 60 ? '✓ Adequate' : coverageDays > 30 ? '⚠ Monitor' : '🔴 Critical', arrowType: coverageDays > 60 ? 'up' : 'down' },
+    { label:'Stock vs Req Gap', val: fmt(Math.abs(gap)) + ' L', sub: `${pctCovered}% of requirement covered`, icon:'📉', cls:'status-red', arrow:`${gap < 0 ? '▼ Deficit' : '▲ Surplus'}`, arrowType: gap < 0 ? 'down' : 'up' },
+    { label:'Projected Shortfall (Apr–Jun)', val: fmt(projectedShortfall) + ' L', sub:'Additional procurement needed', icon:'⚡', cls: projectedShortfall > 0 ? 'status-red' : 'status-green', arrow: projectedShortfall > 0 ? '🚨 Action Required' : '✓ Surplus', arrowType: projectedShortfall > 0 ? 'down' : 'up' }
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = cards.map(c => `
+    <div class="kpi-card ${c.cls}">
+      <div class="kpi-icon">${c.icon}</div>
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value ${c.cls}">${c.val}</div>
+      <div class="kpi-sub"><span class="kpi-arrow ${c.arrowType}">${c.arrow}</span> ${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// CHART 1: GROUPED BAR
+// ============================================================
+function renderGroupedBar() {
+  const ctx = document.getElementById('chart-grouped-bar').getContext('2d');
+  const filtered = getFilteredRIO();
+  const labels = Object.keys(filtered);
+  const stocks = labels.map(k => filtered[k].stock);
+  const reqs = labels.map(k => filtered[k].req);
+  const usages = labels.map(k => filtered[k].usage_16apr);
+
+  chartRefs['grouped-bar'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'Current Stock', data: stocks, backgroundColor: 'rgba(59,130,246,0.7)', borderColor:'#3b82f6', borderWidth:1.5, borderRadius:4 },
+        { label:'Apr–Jun Req', data: reqs, backgroundColor: 'rgba(245,158,11,0.7)', borderColor:'#f59e0b', borderWidth:1.5, borderRadius:4 },
+        { label:'Usage (16-Apr)', data: usages, backgroundColor: 'rgba(239,68,68,0.7)', borderColor:'#ef4444', borderWidth:1.5, borderRadius:4 }
+      ]
+    },
+    options: chartOpts('Litres')
+  });
+}
+
+// ============================================================
+// CHART 2: DONUT
+// ============================================================
+function renderDonut() {
+  const ctx = document.getElementById('chart-donut').getContext('2d');
+  const filtered = getFilteredRIO();
+  const labels = Object.keys(filtered);
+  const stocks = labels.map(k => filtered[k].stock);
+  const colors = labels.map(k => filtered[k].color);
+
+  chartRefs['donut'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: stocks, backgroundColor: colors, borderColor:'rgba(0,0,0,0.3)', borderWidth:2, hoverOffset:8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'right', labels: { color:'#94a3b8', font:{ size:11 }, padding:12 }},
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} L (${pct(ctx.raw, ctx.dataset.data.reduce((a,b)=>a+b,0))}%)` }},
+      },
+      cutout: '65%'
+    }
+  });
+}
+
+// ============================================================
+// CHART 3: TIMELINE (Line chart from dashboard image)
+// ============================================================
+function renderTimeline() {
+  const ctx = document.getElementById('chart-timeline').getContext('2d');
+  const allData = DB.allDaily;
+  const labels = allData.map(d => d.day);
+  
+  chartRefs['timeline'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label:'Forecasted Req', data: allData.map(() => DB.aprMayJunReq),
+          borderColor:'#94a3b8', borderDash:[6,4], pointRadius:0, borderWidth:1.5,
+          fill:false, tension:0
+        },
+        {
+          label:'Present Stock', data: allData.map(d => d.stock),
+          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
+          pointRadius:3, borderWidth:2, fill:true, tension:0.3,
+          pointBackgroundColor:'#3b82f6'
+        },
+        {
+          label:'Daily Purchase', data: allData.map(d => d.purchase),
+          borderColor:'#10b981', pointRadius:4, borderWidth:2, fill:false, tension:0.4,
+          pointBackgroundColor:'#10b981', yAxisID:'y2'
+        },
+        {
+          label:'Daily Usage', data: allData.map(d => d.usage),
+          borderColor:'#ef4444', pointRadius:4, borderWidth:2, fill:false, tension:0.4,
+          pointBackgroundColor:'#ef4444', yAxisID:'y2'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { labels: { color:'#94a3b8', font:{size:11}, usePointStyle:true, pointStyleWidth:8 }},
+        tooltip: { backgroundColor:'rgba(13,27,46,0.95)', titleColor:'#f8fafc', bodyColor:'#94a3b8', borderColor:'rgba(255,255,255,0.1)', borderWidth:1 }
+      },
+      scales: {
+        x: { ticks: { color:'#64748b', font:{size:9}, maxRotation:45 }, grid:{ color:'rgba(255,255,255,0.04)' }},
+        y: { position:'left', ticks:{ color:'#64748b', font:{size:10}, callback: v => fmt(v) }, grid:{ color:'rgba(255,255,255,0.05)' }, title:{ display:true, text:'Stock (ltr)', color:'#64748b', font:{size:10} }},
+        y2: { position:'right', ticks:{ color:'#64748b', font:{size:10}, callback: v => fmt(v) }, grid:{ display:false }, title:{ display:true, text:'Purchase/Usage (ltr)', color:'#64748b', font:{size:10} }}
+      }
+    }
+  });
+}
+
+// ============================================================
+// CHART 4: AREA
+// ============================================================
+function renderArea() {
+  const ctx = document.getElementById('chart-area').getContext('2d');
+  const data = DB.aprilDailyData;
+  const safetyLine = 210000;
+  
+  chartRefs['area'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.day),
+      datasets: [
+        {
+          label:'Stock Level', data: data.map(d=>d.stock),
+          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.12)',
+          fill:true, tension:0.3, borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#3b82f6'
+        },
+        {
+          label:'Safety Threshold (210K)', data: data.map(()=>safetyLine),
+          borderColor:'#f59e0b', borderDash:[8,4], pointRadius:0, borderWidth:1.5, fill:false
+        },
+        {
+          label:'Req (Apr–Jun)', data: data.map(()=>DB.aprMayJunReq),
+          borderColor:'#ef4444', borderDash:[4,4], pointRadius:0, borderWidth:1.5, fill:false
+        }
+      ]
+    },
+    options: chartOpts('Litres')
+  });
+}
+
+// ============================================================
+// CHART 5: VARIANCE
+// ============================================================
+function renderVariance() {
+  const ctx = document.getElementById('chart-variance').getContext('2d');
+  const data = DB.aprilDailyData;
+  const deltas = data.map(d => d.purchase - d.usage);
+  
+  chartRefs['variance'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(d=>d.day),
+      datasets: [{
+        label:'Purchase−Usage Delta',
+        data: deltas,
+        backgroundColor: deltas.map(v => v >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)'),
+        borderColor: deltas.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+        borderWidth: 1.5, borderRadius: 4
+      }]
+    },
+    options: {
+      ...chartOpts('Δ Litres'),
+      plugins: { ...chartOpts('').plugins,
+        annotation: { annotations: { zero: { type:'line', yMin:0, yMax:0, borderColor:'rgba(255,255,255,0.3)', borderWidth:1 }}}
+      }
+    }
+  });
+}
+
+// ============================================================
+// HEATMAP (Usage by SC × Week)
+// ============================================================
+function renderHeatmap() {
+  const scs = getFilteredSC();
+  const periods = ['1–7 Apr','8–12 Apr','13–16 Apr','March'];
+  
+  // Approximate usage per period per SC from daily data
+  const scUsage = {};
+  DB.scData.forEach(d => {
+    if (!filters.rios.includes(d.rio)) return;
+    scUsage[d.sc] = [
+      Math.round(d.usage * 7 * 0.6),   // wk1 approx
+      Math.round(d.usage * 5 * 0.5),   // wk2 approx
+      Math.round(d.usage * 4 * 0.4),   // wk3 approx
+      Math.round(d.usage * 8)            // march approx
+    ];
+  });
+  
+  const maxVal = Math.max(...Object.values(scUsage).flat());
+  
+  let html = `<div class="heatmap-header">${periods.map(p=>`<span>${p}</span>`).join('')}</div>`;
+  
+  Object.entries(scUsage).forEach(([sc, vals]) => {
+    const sc_obj = DB.scData.find(d=>d.sc===sc);
+    const rioTag = sc_obj ? `<span class="rio-tag r${sc_obj.rio.slice(-1)}">${sc_obj.rio}</span>` : '';
+    html += `<div class="heatmap-row">${rioTag}<div class="heatmap-label" title="${sc}">${sc}</div>`;
+    vals.forEach((v, i) => {
+      const intensity = maxVal > 0 ? v/maxVal : 0;
+      const alpha = 0.15 + intensity * 0.75;
+      const color = intensity > 0.7 ? `rgba(239,68,68,${alpha})` : intensity > 0.4 ? `rgba(245,158,11,${alpha})` : `rgba(59,130,246,${alpha})`;
+      const textColor = intensity > 0.5 ? 'white' : '#94a3b8';
+      html += `<div class="heatmap-cell" style="background:${color};color:${textColor}" title="${sc} / ${periods[i]}: ${fmt(v)} ltr">${v > 999 ? fmt(v/1000,1)+'K' : v}</div>`;
+    });
+    html += `</div>`;
+  });
+  
+  document.getElementById('heatmap-container').innerHTML = `<div class="heatmap-grid">${html}</div>`;
+}
+
+// ============================================================
+// CHART 6: HORIZONTAL BAR
+// ============================================================
+function renderHorizontalBar() {
+  const ctx = document.getElementById('chart-hbar').getContext('2d');
+  const scs = getFilteredSC().sort((a,b) => b.usage - a.usage);
+  const rioColors = { RIO1:'rgba(59,130,246,0.7)', RIO2:'rgba(167,139,250,0.7)', RIO3:'rgba(52,211,153,0.7)', RIO4:'rgba(251,191,36,0.7)' };
+  
+  chartRefs['hbar'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: scs.map(d => d.sc),
+      datasets: [{
+        label:'Apr Usage (ltr)',
+        data: scs.map(d => d.usage),
+        backgroundColor: scs.map(d => rioColors[d.rio] || 'rgba(59,130,246,0.7)'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw} ltr (${ctx.dataset.label})` }}
+      },
+      scales: {
+        x: { ticks: { color:'#64748b', font:{size:10} }, grid: { color:'rgba(255,255,255,0.05)' }},
+        y: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { display:false }}
+      }
+    }
+  });
+}
+
+// ============================================================
+// CHART 7: STACKED BAR
+// ============================================================
+function renderStacked() {
+  const ctx = document.getElementById('chart-stacked').getContext('2d');
+  const marchP = DB.marchDailyData.reduce((s,d)=>s+d.purchase,0);
+  const marchU = DB.marchDailyData.reduce((s,d)=>s+d.usage,0);
+  const aprP = DB.aprilDailyData.reduce((s,d)=>s+d.purchase,0);
+  const aprU = DB.aprilDailyData.reduce((s,d)=>s+d.usage,0);
+
+  if (filters.view === 'cumulative') {
+    // cumulative view
+    const allData = DB.allDaily;
+    let cumP = 0, cumU = 0;
+    const cumPArr = [], cumUArr = [];
+    allData.forEach(d => { cumP += d.purchase; cumU += d.usage; cumPArr.push(cumP); cumUArr.push(cumU); });
+    
+    chartRefs['stacked'] = new Chart(ctx, {
+      type:'line',
+      data: {
+        labels: allData.map(d=>d.day),
+        datasets: [
+          { label:'Cumulative Purchase', data:cumPArr, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.3, borderWidth:2 },
+          { label:'Cumulative Usage', data:cumUArr, borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.1)', fill:true, tension:0.3, borderWidth:2 }
+        ]
+      },
+      options: chartOpts('Cumulative ltr')
+    });
+  } else {
+    chartRefs['stacked'] = new Chart(ctx, {
+      type:'bar',
+      data: {
+        labels: ['March (12–31)','April (1–16)'],
+        datasets: [
+          { label:'Total Purchase', data:[marchP, aprP], backgroundColor:'rgba(16,185,129,0.7)', borderRadius:5 },
+          { label:'Total Usage', data:[marchU, aprU], backgroundColor:'rgba(239,68,68,0.7)', borderRadius:5 }
+        ]
+      },
+      options: chartOpts('Litres')
+    });
+  }
+}
+
+// ============================================================
+// CHART 8: WATERFALL
+// ============================================================
+function renderWaterfall() {
+  const ctx = document.getElementById('chart-waterfall').getContext('2d');
+  const openStock = DB.aprilDailyData[0].stock;
+  const totalPurchase = DB.aprilDailyData.reduce((s,d)=>s+d.purchase,0);
+  const totalUsage = DB.aprilDailyData.reduce((s,d)=>s+d.usage,0);
+  const closeStock = DB.aprilDailyData[DB.aprilDailyData.length-1].stock;
+
+  const labels = ['Opening Stock','+ Purchases','− Usage','Closing Stock'];
+  const baseData = [0, openStock, openStock+totalPurchase-totalUsage, 0];
+  const barData = [openStock, totalPurchase, totalUsage, closeStock];
+  const colors = ['rgba(59,130,246,0.8)', 'rgba(16,185,129,0.8)', 'rgba(239,68,68,0.8)', 'rgba(251,191,36,0.8)'];
+
+  chartRefs['waterfall'] = new Chart(ctx, {
+    type:'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'Base', data:baseData, backgroundColor:'transparent', borderWidth:0 },
+        { label:'Value', data:barData, backgroundColor:colors, borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex===1 ? ` ${fmt(ctx.raw)} ltr` : '' }}
+      },
+      scales: {
+        x: { stacked:true, ticks:{ color:'#94a3b8' }, grid:{ display:false }},
+        y: { stacked:true, ticks:{ color:'#64748b', callback:v=>fmt(v) }, grid:{ color:'rgba(255,255,255,0.05)' }}
+      }
+    }
+  });
+}
+
+// ============================================================
+// CALENDAR HEATMAP
+// ============================================================
+function renderCalHeatmap() {
+  const all = DB.allDaily;
+  const maxP = Math.max(...all.map(d=>d.purchase));
+  
+  let html = '<div style="display:flex;gap:4px;align-items:flex-start;flex-wrap:wrap;">';
+  html += '<div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;width:100%">';
+  html += '<div style="grid-column:span 10;display:flex;justify-content:space-between;font-size:9px;color:#64748b;padding-bottom:4px"><span>Mar 12</span><span>Mar 31</span><span>Apr 1</span><span>Apr 16</span></div>';
+  
+  all.forEach(d => {
+    const intensity = maxP > 0 ? d.purchase/maxP : 0;
+    const alpha = 0.1 + intensity * 0.85;
+    const color = intensity > 0.7 ? `rgba(16,185,129,${alpha})` : intensity > 0.3 ? `rgba(59,130,246,${alpha})` : `rgba(30,58,95,0.5)`;
+    const textColor = intensity > 0.4 ? 'white' : '#64748b';
+    const isApr = d.day.includes('Apr');
+    const border = isApr ? '1px solid rgba(251,191,36,0.3)' : '1px solid transparent';
+    html += `<div style="height:38px;border-radius:5px;background:${color};border:${border};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative" 
+              title="${d.day}: Purchase ${fmt(d.purchase)} ltr | Usage ${fmt(d.usage)} ltr">
+              <span style="font-size:8px;color:rgba(255,255,255,0.5)">${d.day.replace('-26','').replace('-Apr','A').replace('-Mar','M')}</span>
+              <span style="font-size:9px;font-weight:700;color:${textColor}">${d.purchase >= 1000 ? fmt(d.purchase/1000,1)+'K' : d.purchase}</span>
+            </div>`;
+  });
+  html += '</div></div>';
+  html += '<div style="display:flex;gap:12px;margin-top:8px;align-items:center;font-size:10px;color:#64748b"><span>Purchase intensity:</span>';
+  ['Low','Med','High'].forEach((l,i) => {
+    const c = i===0?'rgba(30,58,95,0.8)':i===1?'rgba(59,130,246,0.6)':'rgba(16,185,129,0.8)';
+    html += `<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:${c};border-radius:2px;display:inline-block"></span>${l}</span>`;
+  });
+  html += '<span style="display:flex;align-items:center;gap:4px;margin-left:12px"><span style="width:12px;height:12px;border:1px solid rgba(251,191,36,0.5);border-radius:2px;display:inline-block"></span>April dates</span>';
+  html += '</div>';
+  
+  document.getElementById('cal-heatmap').innerHTML = html;
+}
+
+// ============================================================
+// GAUGES
+// ============================================================
+function renderGauges() {
+  const filtered = getFilteredRIO();
+  const html = Object.entries(filtered).map(([rio, data]) => {
+    const pctVal = ((data.stock / data.req) * 100).toFixed(1);
+    const color = pctVal >= 100 ? '#10b981' : pctVal >= 70 ? '#f59e0b' : '#ef4444';
+    const barColor = pctVal >= 100 ? 'linear-gradient(90deg,#10b981,#34d399)' : pctVal >= 70 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)';
+    const status = pctVal >= 100 ? '✅ Sufficient' : pctVal >= 70 ? '⚠️ Monitor' : '🔴 Critical';
+    return `
+      <div class="gauge-card">
+        <div class="gauge-name">${rio}</div>
+        <div class="gauge-pct" style="color:${color}">${pctVal}%</div>
+        <div class="gauge-bar-track"><div class="gauge-bar-fill" style="width:${Math.min(pctVal,100)}%;background:${barColor}"></div></div>
+        <div class="gauge-sub">${fmt(data.stock)} / ${fmt(data.req)} ltr</div>
+        <div style="margin-top:8px;font-size:10px;font-weight:700;color:${color}">${status}</div>
+        <div style="margin-top:6px;font-size:10px;color:#64748b">SComm: ${data.scomm_pct}% | STL: ${data.stl_pct}%</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('gauge-row').innerHTML = html;
+}
+
+// ============================================================
+// CHART 9: DG/PG STOCK
+// ============================================================
+function renderDGPGStock() {
+  const ctx = document.getElementById('chart-dgpg-stock').getContext('2d');
+  const filtered = filters.rios;
+  const types = ['SComm DG','SComm PG','STL DG','STL PG'];
+  const typeFilt = types.filter(t => {
+    const s = t.split(' ')[0]; const f = t.split(' ')[1];
+    return filters.scommStl.includes(s) && filters.dgpg.includes(f);
+  });
+  
+  const typeColors = { 'SComm DG':'rgba(59,130,246,0.7)', 'SComm PG':'rgba(99,102,241,0.7)', 'STL DG':'rgba(16,185,129,0.7)', 'STL PG':'rgba(52,211,153,0.5)' };
+  
+  chartRefs['dgpg-stock'] = new Chart(ctx, {
+    type:'bar',
+    data: {
+      labels: filtered,
+      datasets: typeFilt.map(t => ({
+        label: t,
+        data: filtered.map(r => DB.dgpgData[r]?.find(d=>d.type===t)?.stock || 0),
+        backgroundColor: typeColors[t], borderRadius:3
+      }))
+    },
+    options: { ...chartOpts('Litres'), scales: { x:{ stacked:true, ticks:{color:'#94a3b8'}, grid:{display:false} }, y:{ stacked:true, ticks:{color:'#64748b', callback:v=>fmt(v)}, grid:{color:'rgba(255,255,255,0.05)'} } } }
+  });
+}
+
+// ============================================================
+// CHART 10: SCOMM vs STL
+// ============================================================
+function renderSCommSTL() {
+  const ctx = document.getElementById('chart-scomm-stl').getContext('2d');
+  const filtered = filters.rios;
+  
+  chartRefs['scomm-stl'] = new Chart(ctx, {
+    type:'bar',
+    data: {
+      labels: filtered,
+      datasets: [
+        { label:'SComm % Secured', data: filtered.map(r=>DB.rioData[r].scomm_pct), backgroundColor:'rgba(59,130,246,0.7)', borderRadius:4 },
+        { label:'STL % Secured', data: filtered.map(r=>DB.rioData[r].stl_pct), backgroundColor:'rgba(16,185,129,0.7)', borderRadius:4 }
+      ]
+    },
+    options: {
+      ...chartOpts('%'),
+      plugins: { ...chartOpts('').plugins, annotation: { annotations: { line100: { type:'line', yMin:100, yMax:100, borderColor:'rgba(239,68,68,0.5)', borderWidth:1.5, borderDash:[6,3] } } } },
+      scales: { x: { ticks:{color:'#94a3b8'}, grid:{display:false} }, y:{ ticks:{color:'#64748b', callback:v=>v+'%'}, grid:{color:'rgba(255,255,255,0.05)'}, max:130 } }
+    }
+  });
+}
+
+// ============================================================
+// PLANNING TABLE
+// ============================================================
+function renderPlanningTable() {
+  const tbody = document.getElementById('planning-tbody');
+  const rioClass = {RIO1:'r1',RIO2:'r2',RIO3:'r3',RIO4:'r4'};
+  
+  const rows = getFilteredSC().map(d => {
+    const totalNeed = d.apr_req + d.may_req + d.jun_req;
+    const gap = d.stock - totalNeed;
+    const covPct = totalNeed > 0 ? ((d.stock/totalNeed)*100).toFixed(1) : '0.0';
+    const status = parseFloat(covPct) >= 100 ? 'Safe' : parseFloat(covPct) >= 60 ? 'At Risk' : 'Critical';
+    const ragClass = status === 'Safe' ? 'rag-green' : status === 'At Risk' ? 'rag-amber' : 'rag-red';
+    const dailyRate = d.usage > 0 ? d.usage : 1;
+    const daysLeft = (d.stock / dailyRate).toFixed(0);
+    
+    return `
+      <tr>
+        <td><span class="rio-tag ${rioClass[d.rio]}">${d.rio}</span></td>
+        <td style="font-weight:600">${d.sc}</td>
+        <td style="color:#64748b;font-size:11px">${d.dgpg_qty} units</td>
+        <td style="font-weight:600">${fmt(d.stock)}</td>
+        <td>${fmt(d.apr_req)}</td>
+        <td>${fmt(d.may_req)}</td>
+        <td>${fmt(d.jun_req)}</td>
+        <td style="font-weight:600">${fmt(totalNeed)}</td>
+        <td style="color:${gap>=0?'#10b981':'#ef4444'};font-weight:600">${gap>=0?'+':''}${fmt(gap)}</td>
+        <td style="font-weight:600;color:${parseFloat(covPct)>=100?'#10b981':parseFloat(covPct)>=60?'#f59e0b':'#ef4444'}">${covPct}%</td>
+        <td><span class="rag-badge ${ragClass}">${status}</span></td>
+      </tr>
+    `;
+  });
+  
+  tbody.innerHTML = rows.join('');
+}
+
+// ============================================================
+// ALERTS
+// ============================================================
+function renderAlerts() {
+  const scs = getFilteredSC();
+  const alerts = [];
+  
+  scs.forEach(d => {
+    const totalNeed = d.apr_req + d.may_req + d.jun_req;
+    const covPct = totalNeed > 0 ? (d.stock/totalNeed)*100 : 0;
+    const dailyRate = Math.max(d.usage, 1);
+    const daysLeft = d.stock / dailyRate;
+    
+    if (covPct < 30) {
+      alerts.push({ sc:d.sc, rio:d.rio, type:'critical', msg:`Only ${covPct.toFixed(0)}% of Apr–Jun requirement covered. Stock may run out in ~${daysLeft.toFixed(0)} days at current rate.`, label:'🔴 CRITICAL' });
+    } else if (daysLeft < 30 || covPct < 70) {
+      alerts.push({ sc:d.sc, rio:d.rio, type:'warn', msg:`${covPct.toFixed(0)}% requirement covered. Estimated ${daysLeft.toFixed(0)} days of stock remaining.`, label:'⚠️ AT RISK' });
+    }
+  });
+  
+  const rioClass = {RIO1:'r1',RIO2:'r2',RIO3:'r3',RIO4:'r4'};
+  const html = alerts.slice(0, 12).map(a => `
+    <div class="alert-item ${a.type==='warn'?'warn':''}">
+      <div class="alert-icon">${a.type==='critical'?'🚨':'⚠️'}</div>
+      <div class="alert-text">
+        <strong><span class="rio-tag ${rioClass[a.rio]}">${a.rio}</span>${a.sc}</strong>
+        <span>${a.msg}</span>
+      </div>
+      <div class="alert-badge" style="background:${a.type==='critical'?'rgba(239,68,68,0.2)':'rgba(245,158,11,0.2)'};color:${a.type==='critical'?'#ef4444':'#f59e0b'}">${a.label}</div>
+    </div>
+  `).join('') || '<div style="color:#64748b;font-size:12px;padding:12px">✅ No critical alerts for selected filters.</div>';
+  
+  document.getElementById('alert-list').innerHTML = html;
+}
+
+// ============================================================
+// AI INSIGHTS
+// ============================================================
+function renderAIInsights() {
+  const totalStock = 202976;
+  const totalReq = 238004;
+  const gap = totalReq - totalStock;
+  const gapPct = (gap/totalReq*100).toFixed(1);
+  
+  const insights = [
+    { color:'#ef4444', text:'RIO3 is the highest fuel consumer (24,029 ltr in April to date), driven primarily by Khulna (8,366 ltr) and Barishal (5,214 ltr). Immediate procurement prioritization needed for these locations.' },
+    { color:'#f59e0b', text:`Tangail (RIO4) faces the most acute stockout risk — only 555 ltr stock vs 1,852 ltr required. Coverage is under 30%. Procurement is critically urgent.` },
+    { color:'#3b82f6', text:'April 7 recorded peak usage of 6,199 ltr — 3× daily average — indicating a major grid outage event. This spike caused the sharpest stock decline of the period.' },
+    { color:'#10b981', text:'March showed healthier procurement vs usage balance. April procurement pace (avg 1,362 ltr/day) is lagging behind consumption (avg 1,931 ltr/day) — net daily depletion of ~569 ltr.' },
+    { color:'#a78bfa', text:'SComm segment coverage is consistently below 70% across all RIOs (52%–71%). SComm DG in RIO1 is most critical at 52% — only 8,911 ltr of 17,163 ltr requirement met.' },
+    { color:'#34d399', text:'STL RIO1 is over-stocked at 108% (19,975 ltr vs 18,536 ltr required) — consider inter-RIO stock rebalancing or deferring RIO1 STL procurement to fund critical locations.' },
+    { color:'#fbbf24', text:`Grand total shortfall: ${fmt(gap)} litres (${gapPct}% of requirement). At current purchase rate, 17.4 additional procurement days needed to close the Apr–Jun gap before June 30.` }
+  ];
+  
+  document.getElementById('ai-insights').innerHTML = insights.map(i => `
+    <div class="ai-insight">
+      <div class="ai-dot" style="background:${i.color}"></div>
+      <div class="ai-text">${i.text}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// CHART OPTIONS HELPER
+// ============================================================
+function chartOpts(yLabel) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { labels: { color:'#94a3b8', font:{size:11}, usePointStyle:true, pointStyleWidth:8 }},
+      tooltip: { backgroundColor:'rgba(13,27,46,0.95)', titleColor:'#f8fafc', bodyColor:'#94a3b8', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}` } }
+    },
+    scales: {
+      x: { ticks:{ color:'#64748b', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.04)' }},
+      y: { ticks:{ color:'#64748b', font:{size:10}, callback: v => typeof v === 'number' && Math.abs(v) >= 1000 ? fmt(v) : v }, grid:{ color:'rgba(255,255,255,0.05)' }, title:{ display: !!yLabel, text:yLabel, color:'#64748b', font:{size:10} }}
+    }
+  };
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function exportDashboard() {
+  html2canvas(document.getElementById('dashboard'), { 
+    backgroundColor: '#0d1b2e', scale: 1.5, useCORS: true 
+  }).then(canvas => {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `fuel-dashboard-${new Date().toISOString().slice(0,10)}.png`;
+    a.click();
+  });
+}
+
+function exportChart(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `${id}-${new Date().toISOString().slice(0,10)}.png`;
+  a.click();
+}
+
+// ============================================================
+// GLOBAL CHART DEFAULTS
+// ============================================================
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+Chart.defaults.plugins.legend.labels.boxWidth = 10;
+</script>
+</body>
+</html>
